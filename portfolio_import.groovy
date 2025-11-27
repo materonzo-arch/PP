@@ -3,7 +3,7 @@ import java.net.URL
 import groovy.json.JsonSlurper
 import java.text.SimpleDateFormat
 
-def githubRawUrl = "https://raw.githubusercontent.com/TUO_USERNAME/scrape-fonte-dinamico/main/fonte_dinamico.json"
+def githubRawUrl = "https://raw.githubusercontent.com/materonzo-arch/scrape-fonte-dinamico/main/fonte_dinamico.json"
 println "🌐 Scaricando NAV da GitHub: $githubRawUrl"
 
 try {
