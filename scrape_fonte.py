@@ -5,6 +5,7 @@ import re
 from datetime import datetime
 
 def scrape_fonte_dinamico():
+    print(">>> STO ESEGUENDO LA VERSIONE NUOVA DELLO SCRIPT")
     url = "https://www.fondofonte.it/gestione-finanziaria/i-valori-quota-dei-comparti/comparto-dinamico/"
     print(f"Scarico da {url}")
     
@@ -48,12 +49,13 @@ def scrape_fonte_dinamico():
         "nav_history": nav_data
     }
     
-    with open("fonte_dinamico.json", "w", encoding="utf-8") as f:
-        json.dump(output, f, indent=2, ensure_ascii=False)
-    
+    # --- CSV per PortfolioPerformance (DENTRO la funzione) ---
     csv_content = "data;prezzo;valuta\n"
     for entry in nav_
         csv_content += f"{entry['date']};{entry['nav']:.3f};EUR\n"
+    
+    with open("fonte_dinamico.json", "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2, ensure_ascii=False)
     
     with open("fonte_dinamico_portfolio.csv", "w", encoding="utf-8") as f:
         f.write(csv_content)
