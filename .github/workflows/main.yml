@@ -1,0 +1,34 @@
+name: 🌊 Aggiorna FONTE DINAMICO NAV
+
+on:
+  schedule:
+    - cron: '0 6 1 * *'  # 1° giorno ogni mese alle 06:00 UTC
+  workflow_dispatch:     # Pulsante manuale su GitHub
+
+jobs:
+  update-nav:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: 📦 Installa dipendenze
+      run: |
+        pip install requests beautifulsoup4 lxml
+        
+    - name: 🚀 Esegui scraping
+      run: python scrape_fonte.py
+      
+    - name: 📊 Commit risultati
+      run: |
+        git config user.name "GitHub Actions Bot"
+        git config user.email "actions@github.com"
+        git add fonte_dinamico.*
+        git commit -m "📈 Update NAV FONTE DINAMICO $(date +'%Y-%m-%d')" || exit 0
+        git push
