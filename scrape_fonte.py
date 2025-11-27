@@ -10,41 +10,36 @@ def scrape_fonte_dinamico():
     
     response = requests.get(url, timeout=10)
     response.raise_for_status()
-    soup = BeautifulSoup(response.text, 'html.parser')
+    soup = BeautifulSoup(response.text, "html.parser")
     
     content = soup.get_text()
     nav_data = []
     
-    # Mappa mesi italiani
     months_it = {
-        'Gennaio': '01', 'Febbraio': '02', 'Marzo': '03', 'Aprile': '04',
-        'Maggio': '05', 'Giugno': '06', 'Luglio': '07', 'Agosto': '08',
-        'Settembre': '09', 'Ottobre': '10', 'Novembre': '11', 'Dicembre': '12'
+        "Gennaio": "01", "Febbraio": "02", "Marzo": "03", "Aprile": "04",
+        "Maggio": "05", "Giugno": "06", "Luglio": "07", "Agosto": "08",
+        "Settembre": "09", "Ottobre": "10", "Novembre": "11", "Dicembre": "12"
     }
     
-    # Trova anni (##### 2025)
-    years = re.findall(r'#####\s*(\d{4})', content)
+    years = re.findall(r"#####\s*(\d{4})", content)
     year_idx = 0
     
-    # Pattern: Mese + NAV (Ottobre 25,437)
-    patterns = re.findall(r'([A-Za-zàèìòù]+)\s+([\d,]+)', content)
+    patterns = re.findall(r"([A-Za-zàèìòù]+)\s+([\d,]+)", content)
     
     for month_name, nav_str in patterns:
-        if month_name in months_it and ',' in nav_str and year_idx < len(years):
+        if month_name in months_it and "," in nav_str and year_idx < len(years):
             month_num = months_it[month_name]
-            nav = float(nav_str.replace(',', '.'))
+            nav = float(nav_str.replace(",", "."))
             year = years[year_idx]
             
             date_str = f"{year}-{month_num}-01"
             nav_data.append({"date": date_str, "nav": nav})
             
-            if month_name == 'Dicembre':
+            if month_name == "Dicembre":
                 year_idx += 1
     
-    # Ordina cronologicamente
-    nav_data = sorted(nav_data, key=lambda x: x['date'])
+    nav_data = sorted(nav_data, key=lambda x: x["date"])
     
-    # Output JSON per PortfolioPerformance
     output = {
         "fund_name": "FONTE DINAMICO - Comparto Dinamico",
         "currency": "EUR",
@@ -53,16 +48,14 @@ def scrape_fonte_dinamico():
         "nav_history": nav_data
     }
     
-    # Salva JSON
-    with open("fonte_dinamico.json", "w", encoding='utf-8') as f:
+    with open("fonte_dinamico.json", "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
     
-    # CSV per import manuale
     csv_content = "data;prezzo;valuta\n"
     for entry in nav_
         csv_content += f"{entry['date']};{entry['nav']:.3f};EUR\n"
     
-    with open("fonte_dinamico_portfolio.csv", "w", encoding='utf-8') as f:
+    with open("fonte_dinamico_portfolio.csv", "w", encoding="utf-8") as f:
         f.write(csv_content)
     
     print(f"✅ Estratti {len(nav_data)} NAV da {nav_data[0]['date']} a {nav_data[-1]['date']}")
@@ -72,3 +65,4 @@ def scrape_fonte_dinamico():
 
 if __name__ == "__main__":
     scrape_fonte_dinamico()
+
