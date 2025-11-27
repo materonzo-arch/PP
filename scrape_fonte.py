@@ -6,7 +6,7 @@ from datetime import datetime
 
 def scrape_fonte_dinamico():
     url = "https://www.fondofonte.it/gestione-finanziaria/i-valori-quota-dei-comparti/comparto-dinamico/"
-    print(f"📡 Scaricando da {url}")
+    print(f"Scarico da {url}")
     
     response = requests.get(url, timeout=10)
     response.raise_for_status()
@@ -58,11 +58,10 @@ def scrape_fonte_dinamico():
     with open("fonte_dinamico_portfolio.csv", "w", encoding="utf-8") as f:
         f.write(csv_content)
     
-    print(f"✅ Estratti {len(nav_data)} NAV da {nav_data[0]['date']} a {nav_data[-1]['date']}")
-    print("💾 Salvati: fonte_dinamico.json + fonte_dinamico_portfolio.csv")
+    print(f"Estratti {len(nav_data)} NAV da {nav_data[0]['date']} a {nav_data[-1]['date']}")
+    print("Salvati: fonte_dinamico.json + fonte_dinamico_portfolio.csv")
     
     return output
 
 if __name__ == "__main__":
     scrape_fonte_dinamico()
-
