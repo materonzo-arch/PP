@@ -51,7 +51,7 @@ def scrape_fonte_dinamico():
     
     # --- CSV per PortfolioPerformance (DENTRO la funzione) ---
     csv_content = "data;prezzo;valuta\n"
-    for entry in nav_
+    for entry in nav_data:  # Corretto: era "nav_" invece di "nav_data"
         csv_content += f"{entry['date']};{entry['nav']:.3f};EUR\n"
     
     with open("fonte_dinamico.json", "w", encoding="utf-8") as f:
