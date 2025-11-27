@@ -1,0 +1,71 @@
+# .github/workflows/update-fonte.yml
+# Workflow per aggiornare automaticamente i dati del Fondo FONTE
+
+name: Update Fondo FONTE Data
+
+on:
+  # Esegui automaticamente ogni giorno alle 8:00 UTC (9:00 CET)
+  schedule:
+    - cron: '0 8 * * *'
+  
+  # Permetti esecuzione manuale dal tab Actions
+  workflow_dispatch:
+  
+  # Esegui ad ogni push (per test)
+  push:
+    branches: [ main, master ]
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write  # Necessario per fare commit
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: 🔄 Run scraper
+        run: |
+          python scrape_fonte.py
+      
+      - name: 📊 Check for changes
+        id: check_changes
+        run: |
+          if git diff --quiet fonte_dinamico.json; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Nessuna modifica ai dati"
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "✅ Dati aggiornati rilevati"
+          fi
+      
+      - name: 💾 Commit and push if changed
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add fonte_dinamico.json fonte_dinamico.csv
+          git commit -m "🤖 Auto-update: Fondo FONTE data - $(date +'%Y-%m-%d %H:%M')"
+          git push
+      
+      - name: 📤 Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fonte-data
+          path: |
+            fonte_dinamico.json
+            fonte_dinamico.csv
+          retention-days: 30
