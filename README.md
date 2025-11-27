@@ -7,7 +7,7 @@ Questo repository aggiorna automaticamente i valori NAV del **Fondo FONTE Dinami
 Usa questo URL in Portfolio Performance come feed JSON:
 
 ```
-https://raw.githubusercontent.com/TUO-USERNAME/TUO-REPO/main/fonte_dinamico.json
+https://raw.githubusercontent.com/materonzo-arch/PP/main/fonte_dinamico.json
 ```
 
 Sostituisci `TUO-USERNAME` e `TUO-REPO` con i tuoi dati GitHub.
