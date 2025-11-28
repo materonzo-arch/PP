@@ -152,7 +152,7 @@ def scrape_fonchim_crescita():
                 # Cerca la colonna "Crescita"
                 headers = []
                 crescita_col_idx = -1
-                date_col_idx = -1
+                date_col_idx = 0  # La data è sempre la prima colonna
                 
                 if rows:
                     header_row = rows[0]
@@ -168,52 +168,56 @@ def scrape_fonchim_crescita():
                             print(f"✅ Trovata colonna Crescita all'indice {idx}")
                         if 'data' in cell_text or 'periodo' in cell_text or 'mese' in cell_text:
                             date_col_idx = idx
+                            print(f"✅ Trovata colonna Data all'indice {idx}")
                 
                 if crescita_col_idx >= 0:
-                    print(f"🔍 Estraggo dati dalla colonna Crescita (indice {crescita_col_idx})...")
+                    print(f"🔍 Estraggo dati: Data=colonna {date_col_idx}, Crescita=colonna {crescita_col_idx}")
                     # Estrai i dati dalle righe
                     for row_idx, row in enumerate(rows[1:], 1):  # Salta header
                         cells = row.find_elements(By.TAG_NAME, "td")
-                        if len(cells) > max(crescita_col_idx, date_col_idx):
-                            try:
-                                date_text = cells[date_col_idx].text.strip() if date_col_idx >= 0 else ""
-                                value_text = cells[crescita_col_idx].text.strip()
-                                
-                                # Debug prima riga
-                                if row_idx <= 2:
-                                    print(f"  Riga {row_idx}: data='{date_text}' valore='{value_text}'")
-                                
-                                # Rimuovi €, spazi e converti virgola in punto
-                                value_clean = value_text.replace("€", "").replace(" ", "").replace(",", ".").strip()
-                                
-                                if not value_clean:
-                                    continue
-                                
-                                value = float(value_clean)
-                                
-                                # Parsea la data formato DD/MM/YYYY
-                                if date_text and '/' in date_text:
-                                    parts = date_text.split('/')
-                                    if len(parts) == 3:
-                                        day, month, year = parts
-                                        date_formatted = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
-                                        
-                                        nav_data.append({
-                                            "date": date_formatted,
-                                            "value": value
-                                        })
-                                    elif len(parts) == 2:
-                                        month, year = parts
-                                        date_formatted = f"{year}-{month.zfill(2)}-01"
-                                        
-                                        nav_data.append({
-                                            "date": date_formatted,
-                                            "value": value
-                                        })
-                            except (ValueError, IndexError) as e:
-                                if row_idx <= 2:
-                                    print(f"  ⚠️  Errore riga {row_idx}: {e}")
+                        
+                        if len(cells) <= crescita_col_idx:
+                            continue
+                        
+                        try:
+                            date_text = cells[date_col_idx].text.strip()
+                            value_text = cells[crescita_col_idx].text.strip()
+                            
+                            # Debug prime 3 righe
+                            if row_idx <= 3:
+                                print(f"  Riga {row_idx}: [{len(cells)} celle] data='{date_text}' crescita='{value_text}'")
+                            
+                            # Rimuovi €, spazi e converti virgola in punto
+                            value_clean = value_text.replace("€", "").replace(" ", "").replace(",", ".").replace("\u00a0", "").strip()
+                            
+                            if not value_clean or not date_text:
                                 continue
+                            
+                            value = float(value_clean)
+                            
+                            # Parsea la data formato DD/MM/YYYY
+                            if '/' in date_text:
+                                parts = date_text.split('/')
+                                if len(parts) == 3:
+                                    day, month, year = parts
+                                    date_formatted = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                                    
+                                    nav_data.append({
+                                        "date": date_formatted,
+                                        "value": value
+                                    })
+                                elif len(parts) == 2:
+                                    month, year = parts
+                                    date_formatted = f"{year}-{month.zfill(2)}-01"
+                                    
+                                    nav_data.append({
+                                        "date": date_formatted,
+                                        "value": value
+                                    })
+                        except (ValueError, IndexError) as e:
+                            if row_idx <= 3:
+                                print(f"  ⚠️  Errore riga {row_idx}: {e}")
+                            continue
                     
                     print(f"✅ Estratte {len(nav_data)} righe dalla tabella")
             except Exception as e:
