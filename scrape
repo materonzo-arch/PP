@@ -1,6 +1,0 @@
-scrape-fonte-dinamico/
-├── scrape_fonte.py              # Script Python scraping
-├── portfolio_import.groovy      # Script PortfolioPerformance
-├── .github/workflows/update.yml # GitHub Action mensile
-├── README.md                    # Istruzioni
-└── fonte_dinamico.json          # Output esempio
