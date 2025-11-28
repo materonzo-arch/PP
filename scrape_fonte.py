@@ -13,6 +13,8 @@ Output:
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import json
 import re
 from datetime import datetime
@@ -31,7 +33,7 @@ def scrape_fonte_dinamico():
     
     # Configurazione Chrome headless
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
@@ -39,37 +41,80 @@ def scrape_fonte_dinamico():
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
-    # Su GitHub Actions usa chromium-chromedriver
-    chrome_options.binary_location = "/usr/bin/chromium-browser"
+    # Prova diversi percorsi di Chrome
+    chrome_paths = [
+        "/usr/bin/chromium-browser",
+        "/usr/bin/chromium",
+        "/usr/bin/google-chrome",
+        None  # Usa quello di default
+    ]
     
     driver = None
+    for chrome_path in chrome_paths:
+        try:
+            if chrome_path:
+                chrome_options.binary_location = chrome_path
+                print(f"🔍 Provo Chrome: {chrome_path}")
+            else:
+                print("🔍 Provo Chrome di default")
+            
+            driver = webdriver.Chrome(options=chrome_options)
+            print(f"✅ Chrome avviato!")
+            break
+        except Exception as e:
+            if chrome_path:
+                print(f"❌ {chrome_path} non funziona: {str(e)[:100]}")
+            continue
+    
+    if not driver:
+        print("❌ Impossibile avviare Chrome!")
+        sys.exit(1)
+    
     try:
-        print("🌐 Avvio browser headless...")
-        
-        # Usa ChromeDriver di sistema
-        from selenium.webdriver.chrome.service import Service
-        service = Service("/usr/bin/chromedriver")
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        
         driver.set_page_load_timeout(30)
         driver.get(url)
         
-        print("⏳ Attendo caricamento contenuto...")
-        time.sleep(8)  # Aspetta il caricamento JavaScript
+        print("⏳ Attendo caricamento pagina...")
+        time.sleep(5)
         
-        # Prendi tutto il testo
+        # Trova tutti gli elementi cliccabili degli anni (accordion)
+        print("🔍 Cerco gli accordion degli anni...")
+        
+        # Cerca elementi con pattern [YYYY] o link javascript
+        year_elements = driver.find_elements(By.XPATH, "//a[contains(@href, 'javascript')]")
+        print(f"📋 Trovati {len(year_elements)} elementi cliccabili")
+        
+        # Clicca su tutti gli accordion per espanderli
+        for element in year_elements[:20]:  # Limita a 20 per sicurezza
+            try:
+                driver.execute_script("arguments[0].click();", element)
+                time.sleep(0.3)  # Piccola pausa tra i click
+            except:
+                pass
+        
+        print("⏳ Aspetto espansione contenuti...")
+        time.sleep(3)
+        
+        # Prendi tutto il contenuto HTML
+        page_source = driver.page_source
         page_text = driver.find_element(By.TAG_NAME, "body").text
         
-        print(f"✅ Pagina caricata: {len(page_text)} caratteri")
+        print(f"✅ Contenuto caricato: {len(page_text)} caratteri")
         
-        if len(page_text) < 500:
-            print("⚠️ Contenuto troppo breve!")
-            print("Contenuto:")
-            print(page_text[:500])
-            raise ValueError("Pagina non caricata correttamente")
+        if len(page_text) < 1500:
+            print("⚠️ Contenuto troppo breve - provo approccio alternativo...")
+            
+            # Prova a fare scroll per attivare lazy loading
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)
+            driver.execute_script("window.scrollTo(0, 0);")
+            time.sleep(2)
+            
+            page_text = driver.find_element(By.TAG_NAME, "body").text
+            print(f"📄 Contenuto dopo scroll: {len(page_text)} caratteri")
         
     except Exception as e:
-        print(f"❌ Errore durante il caricamento: {e}")
+        print(f"❌ Errore caricamento: {e}")
         if driver:
             try:
                 driver.quit()
@@ -86,28 +131,34 @@ def scrape_fonte_dinamico():
         "Settembre": "09", "Ottobre": "10", "Novembre": "11", "Dicembre": "12"
     }
     
-    print("🔍 Estrazione dati...")
+    print("🔍 Estrazione dati dal contenuto...")
     
-    # Cerca pattern anno
-    year_blocks = re.split(r'(\d{4})\s*(?:javascript|Periodo)', page_text)
-    
+    # Cerca pattern anno nel testo
+    lines = page_text.split('\n')
     current_year = None
-    for i, block in enumerate(year_blocks):
-        if re.match(r'^\d{4}$', block.strip()):
-            current_year = block.strip()
+    
+    for i, line in enumerate(lines):
+        line = line.strip()
+        
+        # Cerca anno (linea con solo 4 cifre)
+        if re.match(r'^\d{4}$', line):
+            current_year = line
+            print(f"📅 Anno trovato: {current_year}")
             continue
         
-        if current_year and i > 0:
-            patterns = re.findall(
-                r'(Gennaio|Febbraio|Marzo|Aprile|Maggio|Giugno|Luglio|Agosto|Settembre|Ottobre|Novembre|Dicembre)\s+([\d,]+)',
-                block
-            )
-            
-            for month_name, nav_str in patterns:
-                if month_name in months_it and ',' in nav_str:
+        # Se abbiamo un anno corrente, cerca mese + valore
+        if current_year:
+            # Pattern: Mese seguito da valore con virgola
+            match = re.match(r'^(Gennaio|Febbraio|Marzo|Aprile|Maggio|Giugno|Luglio|Agosto|Settembre|Ottobre|Novembre|Dicembre)$', line)
+            if match and i + 1 < len(lines):
+                month_name = match.group(1)
+                next_line = lines[i + 1].strip()
+                
+                # Il valore dovrebbe essere nella riga successiva
+                if re.match(r'^[\d,]+$', next_line) and ',' in next_line:
                     month_num = months_it[month_name]
                     try:
-                        nav = float(nav_str.replace(",", "."))
+                        nav = float(next_line.replace(",", "."))
                         date_str = f"{current_year}-{month_num}-01"
                         nav_data.append({
                             "date": date_str,
@@ -123,13 +174,14 @@ def scrape_fonte_dinamico():
         pass
     
     if not nav_data:
-        print("❌ ERRORE: Nessun dato estratto dalla pagina!")
-        print("\n📄 Contenuto (primi 2000 caratteri):")
+        print("❌ ERRORE: Nessun dato estratto!")
+        print("\n📄 Contenuto pagina (primi 2000 caratteri):")
         print(page_text[:2000])
-        print("\n💡 Suggerimento: Il sito potrebbe aver cambiato struttura")
+        print("\n📄 Ultime 100 righe del contenuto:")
+        print('\n'.join(lines[-100:]))
         sys.exit(1)
     
-    # Rimuovi duplicati
+    # Rimuovi duplicati e ordina
     seen = set()
     unique_data = []
     for item in nav_data:
