@@ -1,6 +1,6 @@
 """
 Script per scaricare automaticamente i valori NAV del Fondo FONCHIM Crescita
-usando Selenium per gestire contenuto JavaScript dinamico.
+usando Selenium e parsing del testo.
 
 Uso:
   python scrape_fonchim.py
@@ -13,8 +13,6 @@ Output:
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 import json
 import re
 from datetime import datetime
@@ -75,21 +73,10 @@ def scrape_fonchim_crescita():
         driver.get(url)
         
         print("⏳ Attendo caricamento pagina...")
-        time.sleep(8)  # Aspetta caricamento JavaScript
+        time.sleep(8)
         
-        # Prova a trovare tabelle o elementi con i dati
         page_text = driver.find_element(By.TAG_NAME, "body").text
-        page_html = driver.page_source
-        
         print(f"✅ Contenuto caricato: {len(page_text)} caratteri")
-        
-        # Cerca tabelle
-        tables = driver.find_elements(By.TAG_NAME, "table")
-        print(f"📊 Trovate {len(tables)} tabelle")
-        
-        # Cerca anche altri elementi comuni
-        divs_with_data = driver.find_elements(By.XPATH, "//*[contains(text(), 'Crescita') or contains(text(), 'crescita')]")
-        print(f"📋 Trovati {len(divs_with_data)} elementi con 'Crescita'")
         
     except Exception as e:
         print(f"❌ Errore caricamento: {e}")
@@ -100,128 +87,61 @@ def scrape_fonchim_crescita():
                 pass
         sys.exit(1)
     
-    # Parsing dei dati
+    # Parsing dei dati dal testo
     nav_data = []
     
-    print("🔍 Estrazione dati...")
+    print("🔍 Estrazione dati dal testo...")
     
-    # Strategia 1: Cerca pattern data + valore nel testo
-    # Pattern tipici: "01/2024 15,234" o "Gennaio 2024 15,234"
+    # La tabella ha questo formato nel testo:
+    # Data Stabilità Crescita Garantito Moneta
+    # 17/11/2025 € 26,042 € 34,509 € 12,849
+    # 31/10/2025 € 26,184 € 34,831 € 12,873
+    
     lines = page_text.split('\n')
     
+    # Cerca pattern: data DD/MM/YYYY seguita da valori
     for i, line in enumerate(lines):
         line = line.strip()
         
-        # Pattern: data formato DD/MM/YYYY o MM/YYYY + valore
-        match_date_value = re.search(r'(\d{2}/\d{2}/\d{4}|\d{2}/\d{4})\s+([\d,\.]+)', line)
-        if match_date_value:
-            date_str = match_date_value.group(1)
-            value_str = match_date_value.group(2)
-            
-            try:
-                # Converti data
-                if '/' in date_str:
-                    parts = date_str.split('/')
-                    if len(parts) == 3:  # DD/MM/YYYY
-                        date_formatted = f"{parts[2]}-{parts[1]}-{parts[0]}"
-                    elif len(parts) == 2:  # MM/YYYY
-                        date_formatted = f"{parts[1]}-{parts[0]}-01"
-                    else:
-                        continue
-                else:
-                    continue
-                
-                # Converti valore
-                value = float(value_str.replace(",", "."))
-                
-                nav_data.append({
-                    "date": date_formatted,
-                    "value": value
-                })
-            except (ValueError, IndexError):
-                continue
-    
-    # Strategia 2: Se non trova dati, analizza le tabelle HTML
-    if not nav_data and tables:
-        print("🔍 Analizzo tabelle HTML...")
+        # Pattern: DD/MM/YYYY all'inizio della riga
+        date_match = re.match(r'^(\d{1,2}/\d{1,2}/\d{4})', line)
         
-        for table_idx, table in enumerate(tables):
-            try:
-                rows = table.find_elements(By.TAG_NAME, "tr")
+        if date_match:
+            date_str = date_match.group(1)
+            
+            # Prendi il resto della riga dopo la data
+            rest_of_line = line[len(date_str):].strip()
+            
+            # Trova tutti i valori € XX,XXX nella riga
+            values = re.findall(r'€\s*([\d,]+)', rest_of_line)
+            
+            if len(values) >= 2:
+                # values[0] = Stabilità
+                # values[1] = Crescita ✅
+                # values[2] = Garantito (se presente)
+                # values[3] = Moneta (se presente)
                 
-                # Cerca la colonna "Crescita"
-                headers = []
-                crescita_col_idx = -1
-                date_col_idx = 0  # La data è sempre la prima colonna
-                
-                if rows:
-                    header_row = rows[0]
-                    header_cells = header_row.find_elements(By.TAG_NAME, "th")
-                    if not header_cells:
-                        header_cells = header_row.find_elements(By.TAG_NAME, "td")
+                try:
+                    crescita_value = values[1].replace(",", ".")
+                    nav_value = float(crescita_value)
                     
-                    for idx, cell in enumerate(header_cells):
-                        cell_text = cell.text.strip().lower()
-                        headers.append(cell_text)
-                        if 'crescita' in cell_text:
-                            crescita_col_idx = idx
-                            print(f"✅ Trovata colonna Crescita all'indice {idx}")
-                        if 'data' in cell_text or 'periodo' in cell_text or 'mese' in cell_text:
-                            date_col_idx = idx
-                            print(f"✅ Trovata colonna Data all'indice {idx}")
+                    # Converti data DD/MM/YYYY -> YYYY-MM-DD
+                    parts = date_str.split('/')
+                    if len(parts) == 3:
+                        day, month, year = parts
+                        date_formatted = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                        
+                        nav_data.append({
+                            "date": date_formatted,
+                            "value": nav_value
+                        })
+                        
+                        # Debug prime 3 righe
+                        if len(nav_data) <= 3:
+                            print(f"  ✓ {date_str} → Crescita: €{nav_value:.3f}")
                 
-                if crescita_col_idx >= 0:
-                    print(f"🔍 Estraggo dati: Data=colonna {date_col_idx}, Crescita=colonna {crescita_col_idx}")
-                    # Estrai i dati dalle righe
-                    for row_idx, row in enumerate(rows[1:], 1):  # Salta header
-                        cells = row.find_elements(By.TAG_NAME, "td")
-                        
-                        if len(cells) <= crescita_col_idx:
-                            continue
-                        
-                        try:
-                            date_text = cells[date_col_idx].text.strip()
-                            value_text = cells[crescita_col_idx].text.strip()
-                            
-                            # Debug prime 3 righe
-                            if row_idx <= 3:
-                                print(f"  Riga {row_idx}: [{len(cells)} celle] data='{date_text}' crescita='{value_text}'")
-                            
-                            # Rimuovi €, spazi e converti virgola in punto
-                            value_clean = value_text.replace("€", "").replace(" ", "").replace(",", ".").replace("\u00a0", "").strip()
-                            
-                            if not value_clean or not date_text:
-                                continue
-                            
-                            value = float(value_clean)
-                            
-                            # Parsea la data formato DD/MM/YYYY
-                            if '/' in date_text:
-                                parts = date_text.split('/')
-                                if len(parts) == 3:
-                                    day, month, year = parts
-                                    date_formatted = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
-                                    
-                                    nav_data.append({
-                                        "date": date_formatted,
-                                        "value": value
-                                    })
-                                elif len(parts) == 2:
-                                    month, year = parts
-                                    date_formatted = f"{year}-{month.zfill(2)}-01"
-                                    
-                                    nav_data.append({
-                                        "date": date_formatted,
-                                        "value": value
-                                    })
-                        except (ValueError, IndexError) as e:
-                            if row_idx <= 3:
-                                print(f"  ⚠️  Errore riga {row_idx}: {e}")
-                            continue
-                    
-                    print(f"✅ Estratte {len(nav_data)} righe dalla tabella")
-            except Exception as e:
-                continue
+                except (ValueError, IndexError) as e:
+                    continue
     
     try:
         driver.quit()
@@ -231,9 +151,8 @@ def scrape_fonchim_crescita():
     
     if not nav_data:
         print("❌ ERRORE: Nessun dato estratto!")
-        print("\n📄 Contenuto pagina (primi 3000 caratteri):")
-        print(page_text[:3000])
-        print("\n📄 Headers trovati:", headers if 'headers' in locals() else "Nessuna tabella")
+        print("\n📄 Ultime 50 righe del contenuto:")
+        print('\n'.join(lines[-50:]))
         sys.exit(1)
     
     # Rimuovi duplicati e ordina
