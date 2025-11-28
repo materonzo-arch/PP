@@ -12,10 +12,7 @@ Output:
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 import json
 import re
 from datetime import datetime
@@ -26,7 +23,7 @@ def scrape_fonte_dinamico():
     """Scarica i valori NAV dal sito Fondo FONTE usando Selenium"""
     
     print("=" * 60)
-    print("FONDO FONTE DINAMICO - Scraper automatico (Selenium)")
+    print("FONDO FONTE DINAMICO - Scraper automatico")
     print("=" * 60)
     
     url = "https://www.fondofonte.it/gestione-finanziaria/i-valori-quota-dei-comparti/comparto-dinamico/"
@@ -39,33 +36,45 @@ def scrape_fonte_dinamico():
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    
+    # Su GitHub Actions usa chromium-chromedriver
+    chrome_options.binary_location = "/usr/bin/chromium-browser"
     
     driver = None
     try:
         print("🌐 Avvio browser headless...")
-        driver = webdriver.Chrome(options=chrome_options)
+        
+        # Usa ChromeDriver di sistema
+        from selenium.webdriver.chrome.service import Service
+        service = Service("/usr/bin/chromedriver")
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        driver.set_page_load_timeout(30)
         driver.get(url)
         
-        # Aspetta che il contenuto sia caricato
-        print("⏳ Attendo caricamento contenuto dinamico...")
-        time.sleep(5)  # Aspetta 5 secondi per il caricamento JavaScript
+        print("⏳ Attendo caricamento contenuto...")
+        time.sleep(8)  # Aspetta il caricamento JavaScript
         
-        # Prendi tutto il testo della pagina
+        # Prendi tutto il testo
         page_text = driver.find_element(By.TAG_NAME, "body").text
         
-        if len(page_text) < 1000:
-            print(f"⚠️ Contenuto troppo breve ({len(page_text)} caratteri)")
-            print("Primi 500 caratteri:")
+        print(f"✅ Pagina caricata: {len(page_text)} caratteri")
+        
+        if len(page_text) < 500:
+            print("⚠️ Contenuto troppo breve!")
+            print("Contenuto:")
             print(page_text[:500])
             raise ValueError("Pagina non caricata correttamente")
         
-        print(f"✅ Contenuto caricato: {len(page_text)} caratteri")
-        
     except Exception as e:
-        print(f"❌ Errore browser: {e}")
+        print(f"❌ Errore durante il caricamento: {e}")
         if driver:
-            driver.quit()
+            try:
+                driver.quit()
+            except:
+                pass
         sys.exit(1)
     
     # Parsing dei dati
@@ -77,19 +86,18 @@ def scrape_fonte_dinamico():
         "Settembre": "09", "Ottobre": "10", "Novembre": "11", "Dicembre": "12"
     }
     
-    # Dividi per anno
+    print("🔍 Estrazione dati...")
+    
+    # Cerca pattern anno
     year_blocks = re.split(r'(\d{4})\s*(?:javascript|Periodo)', page_text)
     
     current_year = None
     for i, block in enumerate(year_blocks):
-        # Identifica anno (4 cifre)
         if re.match(r'^\d{4}$', block.strip()):
             current_year = block.strip()
             continue
         
-        # Se abbiamo un anno, cerca mesi e valori
         if current_year and i > 0:
-            # Pattern: Mese + Valore con virgola
             patterns = re.findall(
                 r'(Gennaio|Febbraio|Marzo|Aprile|Maggio|Giugno|Luglio|Agosto|Settembre|Ottobre|Novembre|Dicembre)\s+([\d,]+)',
                 block
@@ -108,27 +116,30 @@ def scrape_fonte_dinamico():
                     except ValueError:
                         continue
     
-    driver.quit()
-    print("🔒 Browser chiuso")
+    try:
+        driver.quit()
+        print("🔒 Browser chiuso")
+    except:
+        pass
     
     if not nav_data:
-        print("❌ ERRORE: Nessun dato estratto!")
-        print("\nContenuto pagina (primi 1000 caratteri):")
-        print(page_text[:1000])
+        print("❌ ERRORE: Nessun dato estratto dalla pagina!")
+        print("\n📄 Contenuto (primi 2000 caratteri):")
+        print(page_text[:2000])
+        print("\n💡 Suggerimento: Il sito potrebbe aver cambiato struttura")
         sys.exit(1)
     
-    # Rimuovi duplicati e ordina
+    # Rimuovi duplicati
     seen = set()
     unique_data = []
     for item in nav_data:
-        key = item["date"]
-        if key not in seen:
-            seen.add(key)
+        if item["date"] not in seen:
+            seen.add(item["date"])
             unique_data.append(item)
     
     nav_data = sorted(unique_data, key=lambda x: x["date"])
     
-    # Crea JSON
+    # Crea JSON per Portfolio Performance
     output = {
         "name": "FONTE Dinamico",
         "isin": "N/A",
@@ -140,10 +151,11 @@ def scrape_fonte_dinamico():
         "prices": nav_data
     }
     
-    # Salva file
+    # Salva JSON
     with open("fonte_dinamico.json", "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
     
+    # Salva CSV
     csv_content = "Date;Value;Currency\n"
     for entry in nav_data:
         csv_content += f"{entry['date']};{entry['value']:.4f};EUR\n"
@@ -152,17 +164,18 @@ def scrape_fonte_dinamico():
         f.write(csv_content)
     
     # Statistiche
-    print(f"\n✅ Scraping completato!")
+    print(f"\n✅ Scraping completato con successo!")
     print(f"\n📊 Statistiche:")
-    print(f"   • Totale valori: {len(nav_data)}")
+    print(f"   • Totale valori estratti: {len(nav_data)}")
     print(f"   • Periodo: {nav_data[0]['date']} → {nav_data[-1]['date']}")
     print(f"   • Primo valore: €{nav_data[0]['value']:.4f}")
     print(f"   • Ultimo valore: €{nav_data[-1]['value']:.4f}")
     
-    first_value = nav_data[0]['value']
-    last_value = nav_data[-1]['value']
-    total_return = ((last_value - first_value) / first_value) * 100
-    print(f"   • Rendimento totale: {total_return:+.2f}%")
+    if len(nav_data) >= 2:
+        first_value = nav_data[0]['value']
+        last_value = nav_data[-1]['value']
+        total_return = ((last_value - first_value) / first_value) * 100
+        print(f"   • Rendimento totale: {total_return:+.2f}%")
     
     print(f"\n📁 File generati:")
     print(f"   • fonte_dinamico.json")
@@ -175,10 +188,10 @@ if __name__ == "__main__":
     try:
         scrape_fonte_dinamico()
     except KeyboardInterrupt:
-        print("\n\n⚠️  Operazione interrotta")
+        print("\n\n⚠️  Operazione interrotta dall'utente")
         sys.exit(0)
     except Exception as e:
-        print(f"\n❌ ERRORE: {e}")
+        print(f"\n❌ ERRORE CRITICO: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
