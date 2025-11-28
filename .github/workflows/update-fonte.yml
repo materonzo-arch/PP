@@ -9,7 +9,7 @@ on:
     branches: [ main, master ]
 
 jobs:
-  update-data:
+  update-
     runs-on: ubuntu-latest
     
     permissions:
@@ -18,6 +18,9 @@ jobs:
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
@@ -59,17 +62,40 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+          
+          # Pull prima di modificare per avere l'ultima versione
+          git pull origin main --no-rebase || true
+          
           git add fonte_dinamico.json fonte_dinamico.csv
           
           # Controlla se ci sono modifiche da committare
           if git diff --staged --quiet; then
             echo "ℹ️ Nessuna modifica ai dati"
           else
-            git commit -m "🤖 Auto-update: Fondo FONTE - $(date +'%Y-%m-%d %H:%M UTC')"
-            # Pull prima del push per evitare conflitti
-            git pull --rebase origin main
-            git push
-            echo "✅ File aggiornati e caricati su GitHub"
+            git commit -m "🤖 Auto-update: Fondo FONTE - $(date -u +'%Y-%m-%d %H:%M UTC')"
+            
+            # Push con retry in caso di conflitti
+            max_retries=3
+            retry_count=0
+            
+            while [ $retry_count -lt $max_retries ]; do
+              if git push origin main; then
+                echo "✅ File aggiornati e caricati su GitHub"
+                break
+              else
+                echo "⚠️ Push fallito, tentativo $((retry_count + 1)) di $max_retries"
+                retry_count=$((retry_count + 1))
+                
+                if [ $retry_count -lt $max_retries ]; then
+                  # Pull e riprova
+                  git pull origin main --no-rebase --strategy-option=ours
+                  sleep 2
+                else
+                  echo "❌ Push fallito dopo $max_retries tentativi"
+                  exit 1
+                fi
+              fi
+            done
           fi
       
       - name: 📤 Upload artifacts
