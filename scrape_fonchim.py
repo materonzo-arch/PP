@@ -170,37 +170,52 @@ def scrape_fonchim_crescita():
                             date_col_idx = idx
                 
                 if crescita_col_idx >= 0:
+                    print(f"🔍 Estraggo dati dalla colonna Crescita (indice {crescita_col_idx})...")
                     # Estrai i dati dalle righe
-                    for row in rows[1:]:  # Salta header
+                    for row_idx, row in enumerate(rows[1:], 1):  # Salta header
                         cells = row.find_elements(By.TAG_NAME, "td")
                         if len(cells) > max(crescita_col_idx, date_col_idx):
                             try:
                                 date_text = cells[date_col_idx].text.strip() if date_col_idx >= 0 else ""
                                 value_text = cells[crescita_col_idx].text.strip()
                                 
-                                # Prova a parsare
-                                value = float(value_text.replace(",", ".").replace("€", "").strip())
+                                # Debug prima riga
+                                if row_idx <= 2:
+                                    print(f"  Riga {row_idx}: data='{date_text}' valore='{value_text}'")
                                 
-                                # Parsea la data (vari formati possibili)
-                                if date_text:
-                                    # Prova formato DD/MM/YYYY
-                                    if '/' in date_text:
-                                        parts = date_text.split('/')
-                                        if len(parts) == 3:
-                                            date_formatted = f"{parts[2]}-{parts[1]}-{parts[0]}"
-                                        elif len(parts) == 2:
-                                            date_formatted = f"{parts[1]}-{parts[0]}-01"
-                                        else:
-                                            continue
-                                    else:
-                                        continue
-                                    
-                                    nav_data.append({
-                                        "date": date_formatted,
-                                        "value": value
-                                    })
-                            except (ValueError, IndexError):
+                                # Rimuovi €, spazi e converti virgola in punto
+                                value_clean = value_text.replace("€", "").replace(" ", "").replace(",", ".").strip()
+                                
+                                if not value_clean:
+                                    continue
+                                
+                                value = float(value_clean)
+                                
+                                # Parsea la data formato DD/MM/YYYY
+                                if date_text and '/' in date_text:
+                                    parts = date_text.split('/')
+                                    if len(parts) == 3:
+                                        day, month, year = parts
+                                        date_formatted = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                                        
+                                        nav_data.append({
+                                            "date": date_formatted,
+                                            "value": value
+                                        })
+                                    elif len(parts) == 2:
+                                        month, year = parts
+                                        date_formatted = f"{year}-{month.zfill(2)}-01"
+                                        
+                                        nav_data.append({
+                                            "date": date_formatted,
+                                            "value": value
+                                        })
+                            except (ValueError, IndexError) as e:
+                                if row_idx <= 2:
+                                    print(f"  ⚠️  Errore riga {row_idx}: {e}")
                                 continue
+                    
+                    print(f"✅ Estratte {len(nav_data)} righe dalla tabella")
             except Exception as e:
                 continue
     
