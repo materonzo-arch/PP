@@ -1,17 +1,12 @@
 # .github/workflows/update-fonte.yml
-# Workflow per aggiornare automaticamente i dati del Fondo FONTE
+# Workflow per aggiornare automaticamente i dati del Fondo FONTE con Selenium
 
 name: Update Fondo FONTE Data
 
 on:
-  # Esegui automaticamente ogni giorno alle 8:00 UTC (9:00 CET)
   schedule:
-    - cron: '0 8 * * *'
-  
-  # Permetti esecuzione manuale dal tab Actions
-  workflow_dispatch:
-  
-  # Esegui ad ogni push (per test)
+    - cron: '0 8 * * *'  # Ogni giorno alle 8:00 UTC
+  workflow_dispatch:  # Esecuzione manuale
   push:
     branches: [ main, master ]
 
@@ -20,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     
     permissions:
-      contents: write  # Necessario per fare commit
+      contents: write
     
     steps:
       - name: 📥 Checkout repository
@@ -31,6 +26,11 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+      
+      - name: 🌐 Setup Chrome
+        uses: browser-actions/setup-chrome@latest
+        with:
+          chrome-version: stable
       
       - name: 📦 Install dependencies
         run: |
@@ -58,13 +58,13 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add fonte_dinamico.json fonte_dinamico.csv
-          git commit -m "🤖 Auto-update: Fondo FONTE data - $(date +'%Y-%m-%d %H:%M')"
+          git commit -m "🤖 Auto-update: Fondo FONTE - $(date +'%Y-%m-%d %H:%M')"
           git push
       
       - name: 📤 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: fonte-data
+          name: fonte-data-$(date +'%Y%m%d')
           path: |
             fonte_dinamico.json
             fonte_dinamico.csv
