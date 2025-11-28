@@ -48,30 +48,29 @@ jobs:
           if [ -f "fonte_dinamico.json" ]; then
             echo "✅ JSON file created"
             ls -lh fonte_dinamico.json
+            echo "Preview:"
+            head -20 fonte_dinamico.json
           else
             echo "❌ JSON file not found"
             exit 1
           fi
       
-      - name: 📊 Check for changes
-        id: check_changes
-        run: |
-          if git diff --quiet fonte_dinamico.json; then
-            echo "changes=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ Nessuna modifica ai dati"
-          else
-            echo "changes=true" >> $GITHUB_OUTPUT
-            echo "✅ Dati aggiornati rilevati"
-          fi
-      
-      - name: 💾 Commit and push if changed
-        if: steps.check_changes.outputs.changes == 'true'
+      - name: 💾 Commit and push files
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add fonte_dinamico.json fonte_dinamico.csv
-          git commit -m "🤖 Auto-update: $(date +'%Y-%m-%d %H:%M UTC')"
-          git push
+          
+          # Controlla se ci sono modifiche da committare
+          if git diff --staged --quiet; then
+            echo "ℹ️ Nessuna modifica ai dati"
+          else
+            git commit -m "🤖 Auto-update: Fondo FONTE - $(date +'%Y-%m-%d %H:%M UTC')"
+            # Pull prima del push per evitare conflitti
+            git pull --rebase origin main
+            git push
+            echo "✅ File aggiornati e caricati su GitHub"
+          fi
       
       - name: 📤 Upload artifacts
         if: always()
