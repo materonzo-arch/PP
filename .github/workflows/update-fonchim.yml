@@ -1,0 +1,83 @@
+# .github/workflows/update-fonchim.yml
+name: Update FONCHIM Crescita Data
+
+on:
+  schedule:
+    - cron: '0 9 * * *'  # Ogni giorno alle 9:00 UTC (10:00 CET)
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'scrape_fonchim.py'
+      - '.github/workflows/update-fonchim.yml'
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: 🌐 Setup Chrome and ChromeDriver
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+          chromium-browser --version
+          chromedriver --version
+      
+      - name: 📦 Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium
+          pip list
+      
+      - name: 🔄 Run FONCHIM scraper
+        env:
+          DISPLAY: :99
+        run: |
+          python scrape_fonchim.py
+      
+      - name: 📊 Verify output files
+        run: |
+          if [ -f "fonchim_crescita.json" ]; then
+            echo "✅ JSON file created"
+            ls -lh fonchim_crescita.json
+            echo "Preview:"
+            head -20 fonchim_crescita.json
+          else
+            echo "❌ JSON file not found"
+            exit 1
+          fi
+      
+      - name: 💾 Commit and push files
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add fonchim_crescita.json fonchim_crescita.csv
+          
+          if git diff --staged --quiet; then
+            echo "ℹ️ Nessuna modifica ai dati FONCHIM"
+          else
+            git commit -m "🤖 Auto-update: FONCHIM Crescita - $(date +'%Y-%m-%d %H:%M UTC')"
+            git push
+            echo "✅ File FONCHIM aggiornati"
+          fi
+      
+      - name: 📤 Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fonchim-data
+          path: |
+            fonchim_crescita.json
+            fonchim_crescita.csv
+          retention-days: 30
