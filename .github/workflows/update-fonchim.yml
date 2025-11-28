@@ -68,6 +68,8 @@ jobs:
             echo "ℹ️ Nessuna modifica ai dati FONCHIM"
           else
             git commit -m "🤖 Auto-update: FONCHIM Crescita - $(date +'%Y-%m-%d %H:%M UTC')"
+            # Pull prima del push per evitare conflitti
+            git pull --rebase origin main
             git push
             echo "✅ File FONCHIM aggiornati"
           fi
