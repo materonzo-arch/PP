@@ -62,18 +62,15 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # Pull prima di modificare per avere l'ultima versione
           git pull origin main --no-rebase || true
           
           git add fonte_dinamico.json fonte_dinamico.csv
           
-          # Controlla se ci sono modifiche da committare
           if git diff --staged --quiet; then
             echo "ℹ️ Nessuna modifica ai dati"
           else
             git commit -m "🤖 Auto-update: Fondo FONTE - $(date -u +'%Y-%m-%d %H:%M UTC')"
             
-            # Push con retry in caso di conflitti
             max_retries=3
             retry_count=0
             
@@ -86,7 +83,6 @@ jobs:
                 retry_count=$((retry_count + 1))
                 
                 if [ $retry_count -lt $max_retries ]; then
-                  # Pull e riprova
                   git pull origin main --no-rebase --strategy-option=ours
                   sleep 2
                 else
