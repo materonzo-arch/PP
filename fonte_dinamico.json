@@ -4,8 +4,8 @@
   "currency": "EUR",
   "feed": "custom",
   "source": "https://www.fondofonte.it",
-  "last_updated": "2026-08-08T08:31:38.345042",
-  "total_entries": 217,
+  "last_updated": "2026-08-11T08:46:24.895626",
+  "total_entries": 218,
   "prices": [
     {
       "date": "2008-05-01",
@@ -874,6 +874,10 @@
     {
       "date": "2026-06-01",
       "value": 26.727
+    },
+    {
+      "date": "2026-07-01",
+      "value": 26.571
     }
   ]
 }
