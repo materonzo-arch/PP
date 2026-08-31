@@ -4,8 +4,8 @@
   "currency": "EUR",
   "feed": "custom",
   "source": "https://www.fonchim.it",
-  "last_updated": "2026-08-30T14:17:08.862133",
-  "total_entries": 423,
+  "last_updated": "2026-08-31T16:43:22.035422",
+  "total_entries": 424,
   "prices": [
     {
       "date": "2002-12-31",
@@ -1698,6 +1698,10 @@
     {
       "date": "2026-07-31",
       "value": 36.965
+    },
+    {
+      "date": "2026-08-17",
+      "value": 37.456
     }
   ]
 }
