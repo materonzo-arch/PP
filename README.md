@@ -1,221 +1,150 @@
-# 📈 Fondo FONTE Dinamico - Data Feed per Portfolio Performance
+# 📈 PP – Feed prezzi fondi pensione per Portfolio Performance
 
-Questo repository aggiorna automaticamente i valori NAV del **Fondo FONTE Dinamico** per l'utilizzo in Portfolio Performance.
+Questo repository scarica automaticamente ogni giorno i valori quota di alcuni fondi pensione italiani e li pubblica in formato **JSON** e **CSV**, in modo da poterli usare come fonte di quotazioni in [Portfolio Performance](https://www.portfolio-performance.info/).
 
-## 🔗 Link diretto al JSON
+I fondi pensione non hanno un ISIN né compaiono sui provider di quotazioni classici, quindi i dati vengono letti direttamente dai siti ufficiali dei fondi.
 
-Usa questo URL in Portfolio Performance come feed JSON:
+---
+
+## 📦 Fondi supportati
+
+| Fondo | Comparto | Fonte | File JSON | Aggiornamento (UTC) |
+|---|---|---|---|---|
+| Fon.Te. | Dinamico | [fondofonte.it](https://www.fondofonte.it/gestione-finanziaria/i-valori-quota-dei-comparti/comparto-dinamico/) | `fonte_dinamico.json` | ogni giorno ore 8:00 |
+| Fonchim | Crescita | [fonchim.it](https://www.fonchim.it/site/funziona-fondo/rendimenti-quote) | `fonchim_crescita.json` | ogni giorno ore 9:00 |
+| Core Pension (Amundi) | Azionario Plus | [corepension.it](https://www.corepension.it/product/view/QS0000061309) | `corepension_azionario_plus.json` | ogni giorno ore 10:00 |
+
+> ℹ️ Gli orari sono in UTC: in Italia corrispondono a +1 ora (inverno) o +2 ore (estate).
+
+### Frequenza dei dati
+
+I fondi non pubblicano un valore quota al giorno, quindi aggiornare ogni giorno serve solo a intercettare il nuovo valore appena esce.
+
+- **Fon.Te.**: un valore al mese (nel JSON la data è impostata al giorno `01` del mese di riferimento).
+- **Fonchim**: due valori al mese (circa il 15 e l'ultimo giorno del mese).
+- **Core Pension**: due valori al mese (il 15 e l'ultimo giorno lavorativo).
+
+---
+
+## 🔗 URL per Portfolio Performance
 
 ```
 https://raw.githubusercontent.com/materonzo-arch/PP/main/fonte_dinamico.json
+https://raw.githubusercontent.com/materonzo-arch/PP/main/fonchim_crescita.json
+https://raw.githubusercontent.com/materonzo-arch/PP/main/corepension_azionario_plus.json
 ```
 
-Sostituisci `TUO-USERNAME` e `TUO-REPO` con i tuoi dati GitHub.
+Versioni CSV (alternativa):
 
----
-
-## 🚀 Setup Iniziale
-
-### 1. Crea il repository su GitHub
-
-1. Vai su GitHub e crea un nuovo repository (es. `fondo-fonte-data`)
-2. Può essere pubblico o privato
-3. Non inizializzare con README (lo faremo noi)
-
-### 2. Clona e configura localmente
-
-```bash
-# Clona il repository
-git clone https://github.com/TUO-USERNAME/fondo-fonte-data.git
-cd fondo-fonte-data
-
-# Crea la struttura delle cartelle
-mkdir -p .github/workflows
 ```
-
-### 3. Crea i file necessari
-
-Crea questi file nella root del repository:
-
-#### `scrape_fonte.py`
-Lo script Python principale (vedi artifact separato)
-
-#### `requirements.txt`
-```txt
-requests>=2.31.0
-beautifulsoup4>=4.12.0
-lxml>=4.9.0
-```
-
-#### `.github/workflows/update-fonte.yml`
-Il workflow di GitHub Actions (vedi artifact separato)
-
-#### `.gitignore`
-```txt
-__pycache__/
-*.pyc
-.venv/
-venv/
-.env
-*.log
-```
-
-### 4. Commit e push iniziale
-
-```bash
-git add .
-git commit -m "🎉 Setup iniziale - Fondo FONTE scraper"
-git push origin main
+https://raw.githubusercontent.com/materonzo-arch/PP/main/fonte_dinamico.csv
+https://raw.githubusercontent.com/materonzo-arch/PP/main/fonchim_crescita.csv
+https://raw.githubusercontent.com/materonzo-arch/PP/main/corepension_azionario_plus.csv
 ```
 
 ---
 
-## ⚙️ Configurazione GitHub Actions
+## 📊 Configurazione in Portfolio Performance
 
-### Abilita i permessi di scrittura
+1. Apri (o crea) il titolo, ad esempio *Fon.Te. Dinamico*.
+2. Vai nella scheda **Quotazioni storiche** → **Provider**.
+3. Scegli **JSON**.
+4. Compila i campi:
 
-1. Vai su **Settings** del tuo repository
-2. Vai su **Actions** → **General**
-3. Scorri fino a **Workflow permissions**
-4. Seleziona **"Read and write permissions"**
-5. Salva
+| Campo | Valore |
+|---|---|
+| URL feed | l'URL del JSON del fondo (vedi sopra) |
+| Path to Date | `$.prices[*].date` |
+| Path to Close | `$.prices[*].value` |
+| Formato data | `yyyy-MM-dd` |
 
-### Verifica il workflow
+5. Premi **Test**, poi salva e aggiorna le quotazioni.
 
-1. Vai alla tab **Actions** del repository
-2. Vedrai il workflow "Update Fondo FONTE Data"
-3. Clicca su **Run workflow** per eseguirlo manualmente
+### Struttura del JSON
 
----
-
-## 📊 Come usare in Portfolio Performance
-
-### Metodo 1: Feed JSON (Consigliato)
-
-1. Apri Portfolio Performance
-2. Vai su un titolo o creane uno nuovo
-3. In **"Quotazioni storiche"** → **"Provider"**
-4. Seleziona **"JSON"**
-5. Inserisci l'URL:
-   ```
-   https://raw.githubusercontent.com/TUO-USERNAME/TUO-REPO/main/fonte_dinamico.json
-   ```
-6. Configura:
-   - **Path to Date**: `$.prices[*].date`
-   - **Path to Quote**: `$.prices[*].value`
-   - **Date Format**: `yyyy-MM-dd`
-
-### Metodo 2: Import CSV
-
-1. Scarica `fonte_dinamico.csv` dal repository
-2. In Portfolio Performance: **File** → **Import** → **CSV**
-3. Configura le colonne:
-   - Colonna 1: Data (formato: yyyy-MM-dd)
-   - Colonna 2: Valore
-   - Colonna 3: Valuta (EUR)
-
----
-
-## 🔄 Automazione
-
-Il workflow si esegue automaticamente:
-
-- ⏰ **Ogni giorno alle 8:00 UTC** (9:00 CET)
-- 🔘 **Manualmente** dal tab Actions
-- 📝 **Ad ogni push** su main (per test)
-
-### Modificare la frequenza
-
-Modifica il cron in `.github/workflows/update-fonte.yml`:
-
-```yaml
-schedule:
-  - cron: '0 8 * * *'  # Ogni giorno alle 8 UTC
-  # - cron: '0 */6 * * *'  # Ogni 6 ore
-  # - cron: '0 8 * * 1'  # Ogni lunedì alle 8 UTC
+```json
+{
+  "name": "FONTE Dinamico",
+  "currency": "EUR",
+  "source": "https://...",
+  "last_updated": "2026-11-14T08:00:00",
+  "total_entries": 210,
+  "prices": [
+    { "date": "2008-05-01", "value": 10.0 },
+    { "date": "2008-06-01", "value": 10.1 }
+  ]
+}
 ```
 
 ---
 
-## 🧪 Test Locale
-
-Per testare lo script localmente:
-
-```bash
-# Crea ambiente virtuale
-python -m venv venv
-source venv/bin/activate  # Su Windows: venv\Scripts\activate
-
-# Installa dipendenze
-pip install -r requirements.txt
-
-# Esegui lo scraper
-python scrape_fonte.py
-```
-
-Se funziona, vedrai:
-```
-✅ Scraping completato con successo!
-
-📊 Statistiche:
-   • Totale valori estratti: XXX
-   • Periodo: 2008-05-01 → 2025-XX-01
-   ...
-```
-
----
-
-## 📁 Struttura del Repository
+## 🗂️ Struttura del repository
 
 ```
-fondo-fonte-data/
+PP/
 ├── .github/
 │   └── workflows/
-│       └── update-fonte.yml    # GitHub Actions workflow
-├── scrape_fonte.py             # Script principale
-├── requirements.txt            # Dipendenze Python
-├── fonte_dinamico.json         # Output JSON (auto-generato)
-├── fonte_dinamico.csv          # Output CSV (auto-generato)
-├── .gitignore
+│       ├── update-fonte.yml
+│       ├── update-fonchim.yml
+│       └── update-corepension.yml
+├── scrape_fonte.py
+├── scrape_fonchim.py
+├── scrape_corepension.py
+├── fonte_dinamico.json / .csv                 (generato)
+├── fonchim_crescita.json / .csv               (generato)
+├── corepension_azionario_plus.json / .csv     (generato)
 └── README.md
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## ⚙️ Come funziona
 
-### Il workflow fallisce
-
-1. Controlla i log in **Actions** → seleziona il workflow fallito
-2. Verifica che i permessi di scrittura siano abilitati
-3. Controlla che `requirements.txt` sia presente
-
-### I dati non si aggiornano
-
-1. Verifica che il sito fonte sia raggiungibile
-2. La struttura HTML potrebbe essere cambiata
-3. Controlla i log del workflow per errori specifici
-
-### Portfolio Performance non carica il JSON
-
-1. Verifica che l'URL sia corretto (deve puntare a `raw.githubusercontent.com`)
-2. Se il repo è privato, devi generare un token di accesso
-3. Controlla la sintassi dei path JSON
+- Ogni fondo ha il suo **script Python** (Selenium + Chromium in modalità headless), perché i siti caricano i dati con JavaScript.
+- Ogni fondo ha il suo **workflow GitHub Actions**, che parte:
+  - ogni giorno all'orario indicato in tabella;
+  - manualmente dalla tab **Actions** → *Run workflow*;
+  - quando viene modificato lo script o il workflow di quel fondo.
+- Se i dati cambiano, il workflow fa **commit e push** dei file aggiornati (con `git pull --rebase` prima del push, per evitare conflitti tra workflow).
+- Quando i file JSON/CSV cambiano nel repo, Portfolio Performance li legge dall'URL *raw*.
 
 ---
 
-## 📞 Supporto
+## 🚀 Setup iniziale (se riparti da zero)
 
-- 🐛 **Bug**: Apri una Issue su GitHub
-- 💡 **Suggerimenti**: Pull Request benvenute!
-- 📖 **Documentazione Portfolio Performance**: [docs.portfolio-performance.info](https://docs.portfolio-performance.info)
-
----
-
-## 📄 Licenza
-
-Questo progetto è rilasciato sotto licenza MIT. I dati provengono da [fondofonte.it](https://www.fondofonte.it) e sono di proprietà del Fondo FONTE.
+1. Crea un repository (anche pubblico: gli URL *raw* funzionano subito senza token).
+2. Aggiungi gli script `.py` e i workflow in `.github/workflows/`.
+3. Abilita i permessi di scrittura:
+   **Settings → Actions → General → Workflow permissions → Read and write permissions → Save**.
+4. Vai in **Actions**, scegli un workflow e premi **Run workflow**.
+5. Verifica che il file compaia nel repo. Se non c'è, scarica l'artifact dall'esecuzione e caricalo a mano una prima volta.
 
 ---
 
-**Ultimo aggiornamento**: 2025-11-28
+## 🛠️ Risoluzione dei problemi
+
+| Problema | Cosa fare |
+|---|---|
+| `404 Not found` sull'URL raw | Il file non è ancora nel repo: controlla che il workflow sia verde e che abbia fatto il commit. |
+| Il workflow è verde ma il file non si aggiorna | Probabilmente non ci sono nuovi dati sul sito: è normale. |
+| `failed to push some refs` | Due workflow hanno fatto push insieme: assicurati che ci sia `git pull --rebase origin main` prima di `git push`. |
+| `Nessun dato estratto` | Il sito ha cambiato struttura: apri il log del workflow e adatta il parser nello script. |
+| Workflow che parte per file non correlati | Controlla il blocco `paths:` nel trigger `push` del workflow. |
+| Core Pension non estrae dati | Il sito è il più complesso dei tre: copia il log del run e adatta lo script alla chiamata di rete che contiene le quote. |
+
+---
+
+## ⚠️ Note
+
+- I dati appartengono ai rispettivi fondi pensione e vengono riportati a solo scopo di uso personale. Verifica sempre i valori sui siti ufficiali prima di prendere decisioni.
+- Questo progetto non è affiliato né approvato da Fon.Te., Fonchim, Amundi o Portfolio Performance.
+- Se i siti cambiano struttura, gli script potrebbero smettere di funzionare e vanno aggiornati.
+
+---
+
+## 📝 Changelog
+
+<!-- Aggiungi qui le tue modifiche -->
+- **2026-11**: aggiunto Core Pension Azionario Plus
+- **2026-11**: aggiunto Fonchim Crescita
+- **2026-11**: primo rilascio con Fon.Te. Dinamico
