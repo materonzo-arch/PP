@@ -1,0 +1,56 @@
+name: Update Corepension Azionario Plus
+
+on:
+  schedule:
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'scrape_corepension.py'
+      - '.github/workflows/update-corepension.yml'
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Chromium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+
+      - name: Install dependencies
+        run: pip install selenium
+
+      - name: Run scraper
+        run: python scrape_corepension.py
+
+      - name: Commit and push
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add corepension_azionario_plus.json corepension_azionario_plus.csv
+          if git diff --staged --quiet; then
+            echo "Nessuna modifica"
+          else
+            git commit -m "🤖 Auto-update: Corepension Azionario Plus - $(date +'%Y-%m-%d %H:%M UTC')"
+            git pull --rebase origin main
+            git push
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corepension-data
+          path: |
+            corepension_azionario_plus.json
+            corepension_azionario_plus.csv
