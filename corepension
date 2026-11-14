@@ -1,0 +1,3 @@
+git clone https://github.com/TUO-USERNAME/fondo-fonte-data.git
+cd fondo-fonte-data
+mkdir -p .github/workflows
