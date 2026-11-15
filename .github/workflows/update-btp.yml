@@ -1,0 +1,56 @@
+name: Update BTP Valore Mz30
+
+on:
+  schedule:
+    - cron: '0 17 * * 1-5'
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'scrape_btp.py'
+      - '.github/workflows/update-btp.yml'
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Chromium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+
+      - name: Install dependencies
+        run: pip install selenium requests beautifulsoup4
+
+      - name: Run scraper
+        run: python scrape_btp.py
+
+      - name: Commit and push
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add btp_valore_mz30.json btp_valore_mz30.csv
+          if git diff --staged --quiet; then
+            echo "Nessuna modifica"
+          else
+            git commit -m "🤖 Auto-update: BTP Valore Mz30 - $(date +'%Y-%m-%d %H:%M UTC')"
+            git pull --rebase origin main
+            git push
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btp-data
+          path: |
+            btp_valore_mz30.json
+            btp_valore_mz30.csv
