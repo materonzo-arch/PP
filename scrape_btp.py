@@ -169,8 +169,88 @@ def start_driver():
     sys.exit(1)
 
 
+DEEP_CLICK_JS = """
+const target = arguments[0].toUpperCase();
+function search(root) {
+  for (const el of root.querySelectorAll('*')) {
+    if (el.shadowRoot) { const r = search(el.shadowRoot); if (r) return r; }
+    if (el.children.length === 0 && (el.textContent || '').trim().toUpperCase() === target) return el;
+  }
+  return null;
+}
+const el = search(document);
+if (!el) return false;
+for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+  el.dispatchEvent(new MouseEvent(type, {bubbles: true, composed: true, cancelable: true}));
+}
+return true;
+"""
+
+DEEP_LABELS_JS = """
+const out = new Set();
+function walk(root) {
+  for (const el of root.querySelectorAll('*')) {
+    if (el.shadowRoot) walk(el.shadowRoot);
+    if (el.children.length === 0) {
+      const t = (el.textContent || '').trim();
+      if (t && t.length <= 12) out.add(t);
+    }
+  }
+}
+walk(document);
+return Array.from(out).slice(0, 80);
+"""
+
+PROBE_JS = r"""
+const done = arguments[arguments.length - 1];
+const srcs = Array.from(document.querySelectorAll('script[src]'))
+  .map(s => s.src).filter(s => s.includes('/assets/js/'));
+Promise.all(srcs.map(u => fetch(u).then(r => r.text()).catch(() => '')))
+  .then(a => done(a.join('\n')));
+"""
+
+
+def deep_click(driver, text):
+    """Click su elementi anche dentro gli shadow DOM (web components)."""
+    try:
+        return bool(driver.execute_script(DEEP_CLICK_JS, text))
+    except Exception:
+        return False
+
+
+def probe_bundle(driver):
+    """Cerca nel JS del grafico gli endpoint API (diagnostica)."""
+    print("\n🔎 Analisi del bundle JS del grafico (ricerca endpoint)...")
+    try:
+        driver.set_script_timeout(30)
+        js = driver.execute_async_script(PROBE_JS) or ""
+    except Exception as e:
+        print(f"⚠️  Analisi fallita: {e}")
+        return
+    print(f"   bundle scaricato: {len(js)} caratteri")
+    for label, pattern, flags in [
+        ("/api/", r".{0,70}/api/.{0,120}", 0),
+        ("resolution", r".{0,100}resolution.{0,100}", re.I),
+        ("history|daily|eod", r".{0,80}(?:history|historical|daily|eod).{0,100}", re.I),
+    ]:
+        seen = []
+        for m in re.finditer(pattern, js, flags):
+            s = m.group(0)
+            if s not in seen:
+                seen.append(s)
+            if len(seen) >= 12:
+                break
+        print(f"   [{label}] {len(seen)} occorrenze")
+        for s in seen:
+            print(f"     · {s}")
+    print()
+
+
 def click_first(driver, texts):
     for t in texts:
+        if deep_click(driver, t):
+            print(f"🖱️  Click (shadow DOM) su '{t}'")
+            return True
         els = driver.find_elements(
             By.XPATH,
             f"//*[not(*)][translate(normalize-space(.), 'abcdefghijklmnopqrstuvwxyz', "
@@ -191,7 +271,11 @@ all_urls = []
 
 
 def dump_labels(driver):
-    """Etichette brevi visibili e cliccabili (pulsanti dei periodi, ecc.)."""
+    """Etichette brevi (anche dentro gli shadow DOM)."""
+    try:
+        return driver.execute_script(DEEP_LABELS_JS)
+    except Exception:
+        pass
     labels = set()
     for el in driver.find_elements(By.XPATH, "//button|//a|//li|//span|//label"):
         try:
@@ -262,6 +346,8 @@ def get_history():
             driver.get(url)
             time.sleep(8)
             responses += collect(driver)
+            if "grafici.borsaitaliana.it" in url:
+                probe_bundle(driver)
             click_first(driver, COOKIE_TEXTS)
             time.sleep(2)
             responses += collect(driver)
