@@ -35,7 +35,7 @@ ROME = ZoneInfo("Europe/Rome")
 MIN_DATE = "2024-03-05"  # inizio negoziazione
 COOKIE_TEXTS = ["Accettare tutto", "Accetta tutto", "Accetta tutti", "Accetto"]
 RANGE_TEXTS = ["MAX", "Max", "Tutto", "Tutti", "5A", "5 anni", "5Y", "ALL"]
-PREFERRED = ("close", "c", "last", "chiusura", "riferimento", "reference",
+PREFERRED = ("endpx", "closepx", "close", "c", "last", "chiusura", "riferimento", "reference",
              "prezzo", "price", "value", "nav", "quota", "y", "v")
 
 
@@ -58,6 +58,10 @@ def norm_date(v):
             m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})$", v)
             if m:
                 return f"{m.group(3)}-{m.group(2).zfill(2)}-{m.group(1).zfill(2)}"
+            # formato compatto Borsa Italiana: 20261113 oppure 20261113-09:00:00
+            m = re.match(r"^(\d{4})(\d{2})(\d{2})(?:-|T|\s|$)", v)
+            if m and 2000 <= int(m.group(1)) <= 2100:
+                return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
     except Exception:
         pass
     return None
@@ -169,8 +173,8 @@ def click_first(driver, texts):
     for t in texts:
         els = driver.find_elements(
             By.XPATH,
-            f"//*[self::button or self::a or self::span or self::li or self::div or self::label]"
-            f"[normalize-space(text())='{t}']")
+            f"//*[not(*)][translate(normalize-space(.), 'abcdefghijklmnopqrstuvwxyz', "
+            f"'ABCDEFGHIJKLMNOPQRSTUVWXYZ')='{t.upper()}']")
         for el in els:
             try:
                 if el.is_displayed():
@@ -183,6 +187,20 @@ def click_first(driver, texts):
 
 
 seen_ids = set()
+all_urls = []
+
+
+def dump_labels(driver):
+    """Etichette brevi visibili e cliccabili (pulsanti dei periodi, ecc.)."""
+    labels = set()
+    for el in driver.find_elements(By.XPATH, "//button|//a|//li|//span|//label"):
+        try:
+            t = el.text.strip()
+            if t and len(t) <= 12 and el.is_displayed():
+                labels.add(t)
+        except Exception:
+            continue
+    return sorted(labels)[:60]
 
 
 def collect(driver):
@@ -202,7 +220,10 @@ def collect(driver):
                 continue
             seen_ids.add(rid)
             mime = p["response"].get("mimeType", "").lower()
-            if p.get("type") not in ("XHR", "Fetch") and "json" not in mime:
+            all_urls.append((p.get("type"), mime, p["response"].get("url", "")))
+            if p.get("type") not in ("XHR", "Fetch", "Other") and "json" not in mime:
+                continue
+            if mime.startswith(("image/", "font/", "text/css", "text/html")):
                 continue
             body = driver.execute_cdp_cmd("Network.getResponseBody", {"requestId": rid})["body"]
             out.append((p["response"].get("url", ""), body))
@@ -243,9 +264,13 @@ def get_history():
             responses += collect(driver)
             click_first(driver, COOKIE_TEXTS)
             time.sleep(2)
-            if click_first(driver, RANGE_TEXTS):
-                time.sleep(6)
             responses += collect(driver)
+            print("🔘 Etichette cliccabili:", dump_labels(driver))
+            for t in ["MAX", "Max", "Tutto", "ALL", "5A", "5Y", "3A", "3Y", "1A", "1Y",
+                      "YTD", "6M", "3M", "1M"]:
+                if click_first(driver, [t]):
+                    time.sleep(5)
+                    responses += collect(driver)
             page_text = driver.find_element(By.TAG_NAME, "body").text
         except Exception as e:
             print(f"⚠️  Errore browser: {e}")
@@ -256,6 +281,10 @@ def get_history():
                 pass
 
         print(f"📡 Risposte intercettate: {len(responses)}")
+        print("🧾 Tutte le richieste di rete (tipo | mime | url):")
+        for typ, mime, u in all_urls:
+            if typ not in ("Image", "Font", "Stylesheet", "Media"):
+                print(f"   · {typ} | {mime} | {u[:140]}")
         for u, body in responses:
             print(f"   - {u[:120]} ({len(body)} byte)")
             data = parse_body(body)
@@ -264,7 +293,11 @@ def get_history():
                 find_series(data, found)
             if found:
                 for s in found:
-                    print(f"   ✅ serie candidata: {len(s)} punti")
+                    ndates = len({d for d, _ in s})
+                    if ndates < 20:
+                        print(f"   ⏭️  serie scartata: solo {ndates} date distinte (probabile intraday)")
+                        continue
+                    print(f"   ✅ serie candidata: {len(s)} punti, {ndates} date")
                     if len(s) > len(best):
                         best = s
             else:
