@@ -3,8 +3,8 @@
   "isin": "IT0005583486",
   "currency": "EUR",
   "source": "https://www.borsaitaliana.it/borsa/obbligazioni/mot/btp/scheda/IT0005583486-MOTX.html?lang=it",
-  "last_updated": "2026-11-17T00:42:50.982484",
-  "total_entries": 684,
+  "last_updated": "2026-11-17T23:48:07.937848",
+  "total_entries": 685,
   "prices": [
     {
       "date": "2024-03-05",
@@ -2740,6 +2740,10 @@
     },
     {
       "date": "2026-11-16",
+      "value": 100.18
+    },
+    {
+      "date": "2026-11-17",
       "value": 100.18
     }
   ]
