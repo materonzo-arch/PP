@@ -3,8 +3,8 @@
   "isin": "N/A",
   "currency": "EUR",
   "source": "https://www.corepension.it/product/view/QS0000061309",
-  "last_updated": "2026-11-16T20:10:00.564770",
-  "total_entries": 205,
+  "last_updated": "2026-11-17T18:55:22.071504",
+  "total_entries": 206,
   "prices": [
     {
       "date": "2018-04-30",
@@ -825,6 +825,10 @@
     {
       "date": "2026-10-30",
       "value": 7.721
+    },
+    {
+      "date": "2026-11-16",
+      "value": 7.645
     }
   ]
 }
